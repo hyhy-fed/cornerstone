@@ -4,6 +4,10 @@ import { addColorLayer } from '../rendering/renderColorImage.js';
 import { addPseudoColorLayer } from '../rendering/renderPseudoColorImage.js';
 import { addLabelMapLayer } from '../rendering/renderLabelMapImage.js';
 import setToPixelCoordinateSystem from '../setToPixelCoordinateSystem.js';
+import { Transform } from './transform.js';
+import getImageFitScale from './getImageFitScale.js';
+
+let lastCtScale = 0.0;
 
 function getViewportRatio (baseLayer, targetLayer) {
   if (!baseLayer.syncProps) {
@@ -63,11 +67,12 @@ function syncViewports (layers, activeLayer) {
  *
  * @param {CanvasRenderingContext2D} context Canvas context to draw upon
  * @param {EnabledElementLayer[]} layers The array of all layers for this enabled element
+ * @param {activeLayer} layers
  * @param {Boolean} invalidated A boolean whether or not this image has been invalidated and must be redrawn
  * @returns {void}
  * @memberof Internal
  */
-function renderLayers (context, layers, invalidated) {
+function renderLayers (context, layers, activeLayer, invalidated) {
   // Loop through each layer and draw it to the canvas
   layers.forEach((layer, index) => {
     if (!layer.image) {
@@ -78,7 +83,13 @@ function renderLayers (context, layers, invalidated) {
 
     // Set the layer's canvas to the pixel coordinate system
     layer.canvas = context.canvas;
-    setToPixelCoordinateSystem(layer, context);
+
+    if (layer.image.imageId.indexOf('petmpr') > -1) {
+      const transform = calculatePetFuisonTransform(layer, activeLayer);
+      context.setTransform(transform.m[0], transform.m[1], transform.m[2], transform.m[3], transform.m[4], transform.m[5]);
+    } else {
+      setToPixelCoordinateSystem(layer, context);
+    }
 
     // Render into the layer's canvas
     const colormap = layer.viewport.colormap || layer.options.colormap;
@@ -155,6 +166,36 @@ export default function (enabledElement, invalidated) {
     });
   }
 
+  const bPetFusion = allLayers.some((layer) => {
+    return layer.options && layer.options.name && layer.options.name === 'PET';
+  });
+
+  let bResetPetScale = false;
+
+  if (bPetFusion) {
+    const ctFusionLayer = allLayers.filter((layer) => {
+      return layer.options.name !== 'PET';
+    });
+
+    if (ctFusionLayer.length) {
+      bResetPetScale = ctFusionLayer[0].viewport.scale === lastCtScale ? false : true;
+    }
+
+    allLayers.forEach(function (layer) {
+      if (bResetPetScale && layer.options.name === 'PET') {
+        layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).scaleFactor;
+        rescaleImage(ctFusionLayer[0], layer);
+      }
+      if (layer.options.name !== 'PET') {
+        lastCtScale = layer.viewport.scale;
+      }
+      if (layer.viewport) {
+        updateLayerSyncProps(layer);
+      }
+    });
+    syncViewports(visibleLayers, activeLayer);
+  }
+
   // Sync all viewports in case it's activated
   if (enabledElement.syncViewports === true) {
     syncViewports(visibleLayers, activeLayer);
@@ -170,5 +211,113 @@ export default function (enabledElement, invalidated) {
   context.fillRect(0, 0, enabledElement.canvas.width, enabledElement.canvas.height);
 
   // Render all visible layers
-  renderLayers(context, visibleLayers, invalidated);
+  renderLayers(context, visibleLayers, activeLayer, invalidated);
+}
+
+/**
+ * Calculate the transform for a pet mpr fusion
+ *
+ * @param {EnabledElement} enabledElement The Cornerstone Enabled Element
+ * @param {activeLayer} activeLayer
+ * @return {Transform} The current transform
+ * @memberof Internal
+ */
+function calculatePetFuisonTransform (enabledElement, activeLayer) {
+  // Apply the scale
+  let activeWidthScale = activeLayer.viewport.scale;
+  let activeHeightScale = activeLayer.viewport.scale;
+
+  if (activeLayer.image.rowPixelSpacing < activeLayer.image.columnPixelSpacing) {
+    activeWidthScale *= (activeLayer.image.columnPixelSpacing / activeLayer.image.rowPixelSpacing);
+  } else if (activeLayer.image.columnPixelSpacing < activeLayer.image.rowPixelSpacing) {
+    activeHeightScale *= (activeLayer.image.rowPixelSpacing / activeLayer.image.columnPixelSpacing);
+  }
+
+  const transform = new Transform();
+
+  // Move to center of canvas
+  transform.translate(enabledElement.canvas.width / 2, enabledElement.canvas.height / 2);
+
+  // Apply the rotation before scaling for non square pixels
+  const angle = enabledElement.viewport.rotation;
+
+  if (angle !== 0) {
+    transform.rotate(angle * Math.PI / 180);
+  }
+
+  // Apply the scale
+  let widthScale = activeWidthScale;
+  let heightScale = activeHeightScale;
+
+  const width = enabledElement.viewport.displayedArea.brhc.x - (enabledElement.viewport.displayedArea.tlhc.x - 1);
+  const height = enabledElement.viewport.displayedArea.brhc.y - (enabledElement.viewport.displayedArea.tlhc.y - 1);
+  const activeHeight = activeLayer.viewport.displayedArea.brhc.y - (activeLayer.viewport.displayedArea.tlhc.y - 1);
+
+  const viewportRatio = getViewportRatio(activeLayer, enabledElement);
+
+  widthScale *= viewportRatio;
+  heightScale *= activeHeight / height;
+
+  transform.scale(widthScale, heightScale);
+
+  // Unrotate to so we can translate unrotated
+  if (angle !== 0) {
+    transform.rotate(-angle * Math.PI / 180);
+  }
+
+  // Apply the pan offset
+  transform.translate(enabledElement.viewport.translation.x, enabledElement.viewport.translation.y);
+
+  // Rotate again so we can apply general scale
+  if (angle !== 0) {
+    transform.rotate(angle * Math.PI / 180);
+  }
+
+  // Apply Flip if required
+  if (enabledElement.viewport.hflip) {
+    transform.scale(-1, 1);
+  }
+
+  if (enabledElement.viewport.vflip) {
+    transform.scale(1, -1);
+  }
+
+  // Move back from center of image
+  transform.translate(-width / 2, -height / 2);
+
+  return transform;
+}
+
+/**
+ * Rescale the target layer to the base layer based on the
+ * relative size of each image and their pixel dimensions.
+ *
+ * This function will update the Viewport parameters of the
+ * target layer to a new scale.
+ *
+ * @param {EnabledElementLayer} baseLayer The base layer
+ * @param {EnabledElementLayer} targetLayer The target layer to rescale
+ * @returns {void}
+ * @memberof EnabledElementLayers
+ */
+export function rescaleImage (baseLayer, targetLayer) {
+  if (baseLayer.layerId === targetLayer.layerId) {
+    throw new Error('rescaleImage: both arguments represent the same layer');
+  }
+
+  const baseImage = baseLayer.image;
+  const targetImage = targetLayer.image;
+
+  // Return if these images don't have an imageId (e.g. for dynamic images)
+  if (!baseImage.imageId || !targetImage.imageId) {
+    return;
+  }
+
+  // Column pixel spacing need to be considered when calculating the
+  // ratio between the layer added and base layer images
+  const colRelative = (targetLayer.viewport.displayedArea.columnPixelSpacing * targetImage.width) /
+    (baseLayer.viewport.displayedArea.columnPixelSpacing * baseImage.width);
+  const viewportRatio = targetLayer.viewport.scale / baseLayer.viewport.scale * colRelative;
+
+  targetLayer.viewport.scale = baseLayer.viewport.scale * viewportRatio;
 }
