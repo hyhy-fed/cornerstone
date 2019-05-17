@@ -7,8 +7,6 @@ import setToPixelCoordinateSystem from '../setToPixelCoordinateSystem.js';
 import { Transform } from './transform.js';
 import getImageFitScale from './getImageFitScale.js';
 
-let lastCtScale = 0.0;
-
 function getViewportRatio (baseLayer, targetLayer) {
   if (!baseLayer.syncProps) {
     updateLayerSyncProps(baseLayer);
@@ -86,6 +84,7 @@ function renderLayers (context, layers, activeLayer, invalidated) {
 
     if (layer.image.imageId.indexOf('petmpr') > -1) {
       const transform = calculatePetFuisonTransform(layer, activeLayer);
+
       context.setTransform(transform.m[0], transform.m[1], transform.m[2], transform.m[3], transform.m[4], transform.m[5]);
     } else {
       setToPixelCoordinateSystem(layer, context);
@@ -166,33 +165,33 @@ export default function (enabledElement, invalidated) {
     });
   }
 
-  const bPetFusion = allLayers.some((layer) => {
-    return layer.options && layer.options.name && layer.options.name === 'PET';
+  const bResetPetScale = allLayers.some((layer) => {
+    return layer.options && layer.options.name && layer.options.name === 'PET' && layer.options.reSize;
   });
 
-  let bResetPetScale = false;
-
-  if (bPetFusion) {
+  if (bResetPetScale) {
     const ctFusionLayer = allLayers.filter((layer) => {
       return layer.options.name !== 'PET';
     });
 
-    if (ctFusionLayer.length) {
-      bResetPetScale = ctFusionLayer[0].viewport.scale === lastCtScale ? false : true;
-    }
-
-    allLayers.forEach(function (layer) {
-      if (bResetPetScale && layer.options.name === 'PET') {
-        layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).scaleFactor;
+    for (const layer of allLayers) {
+      if (layer.options.name === 'PET') {
+        if (layer.image.imageId.indexOf('petmpr') > -1) {
+          if (layer.image.height < layer.image.width) {
+            layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).horizontalScale;
+          } else {
+            layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).verticalScale;
+          }
+        } else {
+          layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).scaleFactor;
+        }
         rescaleImage(ctFusionLayer[0], layer);
-      }
-      if (layer.options.name !== 'PET') {
-        lastCtScale = layer.viewport.scale;
+        layer.options.reSize = false
       }
       if (layer.viewport) {
         updateLayerSyncProps(layer);
       }
-    });
+    }
     syncViewports(visibleLayers, activeLayer);
   }
 
