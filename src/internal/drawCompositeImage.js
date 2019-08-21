@@ -65,7 +65,7 @@ function syncViewports (layers, activeLayer) {
  *
  * @param {CanvasRenderingContext2D} context Canvas context to draw upon
  * @param {EnabledElementLayer[]} layers The array of all layers for this enabled element
- * @param {activeLayer} layers
+ * @param {activeLayer} layers the layers
  * @param {Boolean} invalidated A boolean whether or not this image has been invalidated and must be redrawn
  * @returns {void}
  * @memberof Internal
@@ -82,7 +82,7 @@ function renderLayers (context, layers, activeLayer, invalidated) {
     // Set the layer's canvas to the pixel coordinate system
     layer.canvas = context.canvas;
 
-    if (layer.image.imageId.indexOf('petmpr') > -1) {
+    if (layer.image.imageId.indexOf('petmpr') > -1 && layer.image.imageId.indexOf('Axial') === -1) {
       const transform = calculatePetFuisonTransform(layer, activeLayer);
 
       context.setTransform(transform.m[0], transform.m[1], transform.m[2], transform.m[3], transform.m[4], transform.m[5]);
@@ -176,7 +176,7 @@ export default function (enabledElement, invalidated) {
 
     for (const layer of allLayers) {
       if (layer.options.name === 'PET') {
-        if (layer.image.imageId.indexOf('petmpr') > -1) {
+        if (layer.image.imageId.indexOf('petmpr') > -1 && layer.image.imageId.indexOf('Axial') === -1) {
           if (layer.image.height < layer.image.width) {
             layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).horizontalScale;
           } else {
@@ -186,7 +186,7 @@ export default function (enabledElement, invalidated) {
           layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).scaleFactor;
         }
         rescaleImage(ctFusionLayer[0], layer);
-        layer.options.reSize = false
+        layer.options.reSize = false;
       }
       if (layer.viewport) {
         updateLayerSyncProps(layer);
@@ -217,7 +217,7 @@ export default function (enabledElement, invalidated) {
  * Calculate the transform for a pet mpr fusion
  *
  * @param {EnabledElement} enabledElement The Cornerstone Enabled Element
- * @param {activeLayer} activeLayer
+ * @param {activeLayer} activeLayer the active layer
  * @return {Transform} The current transform
  * @memberof Internal
  */
