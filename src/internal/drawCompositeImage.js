@@ -166,7 +166,7 @@ export default function (enabledElement, invalidated) {
   }
 
   const bResetPetScale = allLayers.some((layer) => {
-    return layer.options && layer.options.name && layer.options.name === 'PET' && layer.options.reSize;
+    return layer.options && layer.options.name && layer.options.name === 'PET' && layer.options.resetScale;
   });
 
   if (bResetPetScale) {
@@ -176,7 +176,7 @@ export default function (enabledElement, invalidated) {
 
     for (const layer of allLayers) {
       if (layer.options.name === 'PET') {
-        if (layer.image.imageId.indexOf('petmpr') > -1 && layer.image.imageId.indexOf('Axial') === -1) {
+        if (layer.image.imageId.indexOf('mpr') > -1 && layer.image.imageId.indexOf('axial') === -1) {
           if (layer.image.height < layer.image.width) {
             layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).horizontalScale;
           } else {
@@ -186,7 +186,7 @@ export default function (enabledElement, invalidated) {
           layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).scaleFactor;
         }
         rescaleImage(ctFusionLayer[0], layer);
-        layer.options.reSize = false;
+        layer.options.resetScale = false;
       }
       if (layer.viewport) {
         updateLayerSyncProps(layer);
