@@ -82,7 +82,7 @@ function renderLayers (context, layers, activeLayer, invalidated) {
     // Set the layer's canvas to the pixel coordinate system
     layer.canvas = context.canvas;
 
-    if (layer.image.imageId.indexOf('petmpr') > -1 && layer.image.imageId.indexOf('Axial') === -1) {
+    if (layer.image.imageId.indexOf('mpr') > -1 && layer.image.imageId.indexOf('axial') === -1) {
       const transform = calculatePetFuisonTransform(layer, activeLayer);
 
       context.setTransform(transform.m[0], transform.m[1], transform.m[2], transform.m[3], transform.m[4], transform.m[5]);
