@@ -250,12 +250,34 @@ function calculatePetFuisonTransform (enabledElement, activeLayer) {
 
   const width = enabledElement.viewport.displayedArea.brhc.x - (enabledElement.viewport.displayedArea.tlhc.x - 1);
   const height = enabledElement.viewport.displayedArea.brhc.y - (enabledElement.viewport.displayedArea.tlhc.y - 1);
+  const activeWidth = activeLayer.viewport.displayedArea.brhc.x - (activeLayer.viewport.displayedArea.tlhc.x - 1);
   const activeHeight = activeLayer.viewport.displayedArea.brhc.y - (activeLayer.viewport.displayedArea.tlhc.y - 1);
 
-  const viewportRatio = getViewportRatio(activeLayer, enabledElement);
+  //const viewportRatio = getViewportRatio(activeLayer, enabledElement);
 
-  widthScale *= viewportRatio;
-  heightScale *= activeHeight / height;
+  // match pixel coordinate of two layers
+  const pixelWidthRatio = activeWidth / width
+  const pixelHeightRatio = activeHeight / height
+
+  // match canvas coordinate of two layers
+  const canvasWidthRatio =
+      (width * enabledElement.image.columnPixelSpacing) /
+      (activeWidth * activeLayer.image.columnPixelSpacing)
+  const canvasHeightRatio =
+      (height * enabledElement.image.rowPixelSpacing) /
+      (activeHeight * activeLayer.image.rowPixelSpacing)
+
+  widthScale *= (pixelWidthRatio * canvasWidthRatio)
+  heightScale *= (pixelHeightRatio * canvasHeightRatio)
+
+  //widthScale *= viewportRatio;
+  //heightScale *= activeHeight / height;
+
+  // Apply the pan offset, assuring that the center of the current coordinate anchors on the pet image center
+  transform.translate(
+      activeLayer.viewport.translation.x * activeWidthScale,
+      activeLayer.viewport.translation.y * activeHeightScale
+  )
 
   transform.scale(widthScale, heightScale);
 
@@ -264,8 +286,8 @@ function calculatePetFuisonTransform (enabledElement, activeLayer) {
     transform.rotate(-angle * Math.PI / 180);
   }
 
-  // Apply the pan offset
-  transform.translate(enabledElement.viewport.translation.x, enabledElement.viewport.translation.y);
+  //// Apply the pan offset
+  //transform.translate(enabledElement.viewport.translation.x, enabledElement.viewport.translation.y);
 
   // Rotate again so we can apply general scale
   if (angle !== 0) {
