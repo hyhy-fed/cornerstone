@@ -82,7 +82,7 @@ function renderLayers (context, layers, activeLayer, invalidated) {
     // Set the layer's canvas to the pixel coordinate system
     layer.canvas = context.canvas;
 
-    if (layer.options && layer.options.name === 'PET' && layer.image.imageId.indexOf('mpr') > -1 && layer.image.imageId.indexOf('axial') === -1) {
+    if (layer.options && layer.options.name === 'PET' && layer.image.imageId.indexOf('mpr') > -1) {
       const transform = calculatePetFuisonTransform(layer, activeLayer);
 
       context.setTransform(transform.m[0], transform.m[1], transform.m[2], transform.m[3], transform.m[4], transform.m[5]);
@@ -176,7 +176,7 @@ export default function (enabledElement, invalidated) {
 
     for (const layer of allLayers) {
       if (layer.options.name === 'PET') {
-        if (layer.image.imageId.indexOf('mpr') > -1 && layer.image.imageId.indexOf('axial') === -1) {
+        if (layer.image.imageId.indexOf('mpr') > -1) {
           if (layer.image.height < layer.image.width) {
             layer.viewport.scale = getImageFitScale(enabledElement.canvas, layer.image, 0).horizontalScale;
           } else {
