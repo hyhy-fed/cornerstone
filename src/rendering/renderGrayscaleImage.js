@@ -89,7 +89,9 @@ export function renderGrayscaleImage (enabledElement, invalidated) {
   context.setTransform(1, 0, 0, 1, 0, 0);
 
   // Clear the canvas
-  context.fillStyle = 'black';
+  const { invert } = enabledElement.viewport;
+
+  context.fillStyle = invert ? 'white' : 'black';
   context.fillRect(0, 0, enabledElement.canvas.width, enabledElement.canvas.height);
 
   // Turn off image smooth/interpolation if pixelReplication is set in the viewport
@@ -116,6 +118,9 @@ export function renderGrayscaleImage (enabledElement, invalidated) {
   const sy = enabledElement.viewport.displayedArea.tlhc.y - 1;
   const width = enabledElement.viewport.displayedArea.brhc.x - sx;
   const height = enabledElement.viewport.displayedArea.brhc.y - sy;
+
+  context.fillStyle = 'black';
+  context.fillRect(sx + 1, sy + 1, width - 2, height - 2);
 
   context.drawImage(renderCanvas, sx, sy, width, height, 0, 0, width, height);
 
